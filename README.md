@@ -1,6 +1,6 @@
-# 🚀 SVM - SDK 版本管理器
-
 <div align="center">
+<h1>✨ SVM ✨</h1>
+<h4>SDK Version Manager</h4>
   
 ![SVM Logo](https://img.shields.io/badge/SVM-SDK%20Version%20Manager-blue?style=for-the-badge)
   
@@ -12,7 +12,7 @@
 
 </div>
 
-## ✨ AI 驱动的开发
+## 🚀 AI 驱动的开发
 
 > **惊人事实**: 这个项目完全由 [Cursor AI](https://cursor.sh/) 辅助完成，从设计到实现，没有手写一行代码！整个开发过程仅用了 **12 小时**！
 
