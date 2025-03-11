@@ -2,11 +2,10 @@
 <h1>✨ SVM ✨</h1>
 <h4>SDK Version Manager</h4>
   
-![SVM Logo](https://img.shields.io/badge/SVM-SDK%20Version%20Manager-blue?style=for-the-badge)
-  
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![SVM Logo](https://img.shields.io/badge/svm-v1.0.0-blue)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8.svg)](https://go.dev/)
 [![Made with Cursor](https://img.shields.io/badge/Made%20with-Cursor%20AI-blueviolet)](https://cursor.sh/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **一个强大的多语言SDK版本管理工具，让你轻松切换各种编程语言的版本**
 
