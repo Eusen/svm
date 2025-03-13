@@ -40,7 +40,7 @@ func initGoCmd() {
 
 				// 检查目录是否存在
 				if _, err := os.Stat(installDir); os.IsNotExist(err) {
-					fmt.Println("未找到已安装的 Go 版本")
+					utils.Log.Info("未找到已安装的 Go 版本")
 					return nil
 				}
 
@@ -59,7 +59,7 @@ func initGoCmd() {
 				}
 
 				if len(installedVersions) == 0 {
-					fmt.Println("未找到已安装的 Go 版本")
+					utils.Log.Info("未找到已安装的 Go 版本")
 					return nil
 				}
 
@@ -69,12 +69,12 @@ func initGoCmd() {
 				// 获取当前使用的版本
 				currentVersion, _ := goSdk.GetCurrentVersion()
 
-				fmt.Println("已安装的 Go 版本：")
+				utils.Log.Info("已安装的 Go 版本：")
 				for _, version := range installedVersions {
 					if version == currentVersion {
-						fmt.Printf("- %s (当前使用)\n", version)
+						utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version+" (当前使用)")
 					} else {
-						fmt.Printf("- %s\n", version)
+						utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 					}
 				}
 				return nil
@@ -97,13 +97,13 @@ func initGoCmd() {
 			}
 
 			if all {
-				fmt.Println("所有可用的 Go 版本：")
+				utils.Log.Info("所有可用的 Go 版本：")
 			} else {
-				fmt.Println("可用的 Go 版本：")
+				utils.Log.Info("可用的 Go 版本：")
 			}
 
 			for _, version := range versions {
-				fmt.Printf("- %s\n", version)
+				utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 			}
 			return nil
 		},
@@ -121,6 +121,7 @@ func initGoCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			goSdk := GetSDK("go")
+			utils.Log.Install(fmt.Sprintf("正在安装 Go 版本 %s...", version))
 			return goSdk.Install(version)
 		},
 	}
@@ -132,6 +133,7 @@ func initGoCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			goSdk := GetSDK("go")
+			utils.Log.Delete(fmt.Sprintf("正在删除 Go 版本 %s...", version))
 			return goSdk.Remove(version)
 		},
 	}
@@ -143,6 +145,7 @@ func initGoCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			goSdk := GetSDK("go")
+			utils.Log.Switch(fmt.Sprintf("正在切换到 Go 版本 %s...", version))
 			return goSdk.Use(version)
 		},
 	}
@@ -154,14 +157,15 @@ func initGoCmd() {
 			goSdk := GetSDK("go")
 			version, err := goSdk.GetCurrentVersion()
 			if err != nil {
-				fmt.Println("当前未设置 Go 版本")
+				utils.Log.Info("当前未设置 Go 版本")
 				return nil
 			}
 
 			if version == "" {
-				fmt.Println("当前未设置 Go 版本")
+				utils.Log.Info("当前未设置 Go 版本")
 			} else {
-				fmt.Printf("当前使用的 Go 版本: %s\n", version)
+				utils.Log.Info("当前使用的 Go 版本:")
+				utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version)
 			}
 			return nil
 		},

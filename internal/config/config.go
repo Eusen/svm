@@ -23,6 +23,7 @@ type SDKConfig struct {
 	CurrentVersion string                    `json:"current_version"`
 	EnvVars        []EnvVar                  `json:"env_vars"`
 	VersionCache   map[string]SDKVersionInfo `json:"version_cache"`
+	Components     map[string]string         `json:"components"` // 组件类型 -> 当前版本
 }
 
 // Config 表示全局配置

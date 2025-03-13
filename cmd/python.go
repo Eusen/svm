@@ -40,7 +40,7 @@ func initPythonCmd() {
 
 				// 检查目录是否存在
 				if _, err := os.Stat(installDir); os.IsNotExist(err) {
-					fmt.Println("未找到已安装的 Python 版本")
+					utils.Log.Info("未找到已安装的 Python 版本")
 					return nil
 				}
 
@@ -59,7 +59,7 @@ func initPythonCmd() {
 				}
 
 				if len(installedVersions) == 0 {
-					fmt.Println("未找到已安装的 Python 版本")
+					utils.Log.Info("未找到已安装的 Python 版本")
 					return nil
 				}
 
@@ -69,12 +69,12 @@ func initPythonCmd() {
 				// 获取当前使用的版本
 				currentVersion, _ := pythonSdk.GetCurrentVersion()
 
-				fmt.Println("已安装的 Python 版本：")
+				utils.Log.Info("已安装的 Python 版本：")
 				for _, version := range installedVersions {
 					if version == currentVersion {
-						fmt.Printf("- %s (当前使用)\n", version)
+						utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version+" (当前使用)")
 					} else {
-						fmt.Printf("- %s\n", version)
+						utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 					}
 				}
 				return nil
@@ -97,13 +97,13 @@ func initPythonCmd() {
 			}
 
 			if all {
-				fmt.Println("所有可用的 Python 版本：")
+				utils.Log.Info("所有可用的 Python 版本：")
 			} else {
-				fmt.Println("可用的 Python 版本：")
+				utils.Log.Info("可用的 Python 版本：")
 			}
 
 			for _, version := range versions {
-				fmt.Printf("- %s\n", version)
+				utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 			}
 			return nil
 		},
@@ -121,6 +121,7 @@ func initPythonCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			pythonSdk := GetSDK("python")
+			utils.Log.Install(fmt.Sprintf("正在安装 Python 版本 %s...", version))
 			return pythonSdk.Install(version)
 		},
 	}
@@ -132,6 +133,7 @@ func initPythonCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			pythonSdk := GetSDK("python")
+			utils.Log.Delete(fmt.Sprintf("正在删除 Python 版本 %s...", version))
 			return pythonSdk.Remove(version)
 		},
 	}
@@ -143,6 +145,7 @@ func initPythonCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			pythonSdk := GetSDK("python")
+			utils.Log.Switch(fmt.Sprintf("正在切换到 Python 版本 %s...", version))
 			return pythonSdk.Use(version)
 		},
 	}
@@ -154,14 +157,15 @@ func initPythonCmd() {
 			pythonSdk := GetSDK("python")
 			version, err := pythonSdk.GetCurrentVersion()
 			if err != nil {
-				fmt.Println("当前未设置 Python 版本")
+				utils.Log.Info("当前未设置 Python 版本")
 				return nil
 			}
 
 			if version == "" {
-				fmt.Println("当前未设置 Python 版本")
+				utils.Log.Info("当前未设置 Python 版本")
 			} else {
-				fmt.Printf("当前使用的 Python 版本: %s\n", version)
+				utils.Log.Info("当前使用的 Python 版本:")
+				utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version)
 			}
 			return nil
 		},

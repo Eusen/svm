@@ -357,20 +357,20 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 
 	// 如果是嵌入式Python，尝试添加pip支持
 	if isEmbedded {
-		fmt.Println("检测到嵌入式Python包，尝试添加pip支持...")
+		utils.Log.Install("检测到嵌入式Python包，尝试添加pip支持...")
 
 		// 1. 修改._pth文件，取消注释import site
 		if pthFile != "" {
 			content, err := os.ReadFile(pthFile)
 			if err != nil {
-				fmt.Printf("读取._pth文件失败: %v\n", err)
+				utils.Log.Warning(fmt.Sprintf("读取._pth文件失败: %v", err))
 			} else {
 				// 取消注释import site
-				newContent := strings.Replace(string(content), "#import site", "import site", 1)
+				newContent := strings.ReplaceAll(string(content), "#import site", "import site")
 				if err := os.WriteFile(pthFile, []byte(newContent), 0644); err != nil {
-					fmt.Printf("修改._pth文件失败: %v\n", err)
+					utils.Log.Warning(fmt.Sprintf("修改._pth文件失败: %v", err))
 				} else {
-					fmt.Println("成功修改._pth文件，启用site模块")
+					utils.Log.Success("成功修改._pth文件，启用site模块")
 				}
 			}
 		}
@@ -379,42 +379,42 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 		getPipURL := "https://bootstrap.pypa.io/get-pip.py"
 		getPipPath := filepath.Join(installDir, "get-pip.py")
 
-		fmt.Println("下载get-pip.py...")
+		utils.Log.Install("下载get-pip.py...")
 		resp, err := http.Get(getPipURL)
 		if err != nil {
-			fmt.Printf("下载get-pip.py失败: %v\n", err)
-		} else {
-			defer resp.Body.Close()
+			utils.Log.Warning(fmt.Sprintf("下载get-pip.py失败: %v", err))
+			return nil
+		}
+		defer resp.Body.Close()
 
-			// 保存get-pip.py
-			out, err := os.Create(getPipPath)
-			if err != nil {
-				fmt.Printf("创建get-pip.py文件失败: %v\n", err)
-			} else {
-				defer out.Close()
+		// 保存get-pip.py
+		out, err := os.Create(getPipPath)
+		if err != nil {
+			utils.Log.Warning(fmt.Sprintf("创建get-pip.py文件失败: %v", err))
+			return nil
+		}
+		defer out.Close()
 
-				_, err = io.Copy(out, resp.Body)
-				if err != nil {
-					fmt.Printf("保存get-pip.py失败: %v\n", err)
-				} else {
-					// 3. 运行get-pip.py
-					fmt.Println("运行get-pip.py安装pip...")
-					pythonExe := filepath.Join(installDir, "python.exe")
-					cmd := exec.Command(pythonExe, getPipPath, "--no-warn-script-location")
-					output, err := cmd.CombinedOutput()
-					if err != nil {
-						fmt.Printf("安装pip失败: %v\n%s\n", err, string(output))
-					} else {
-						fmt.Println("pip安装成功")
+		_, err = io.Copy(out, resp.Body)
+		if err != nil {
+			utils.Log.Warning(fmt.Sprintf("保存get-pip.py失败: %v", err))
+			return nil
+		}
 
-						// 4. 创建Scripts目录（如果不存在）
-						scriptsDir := filepath.Join(installDir, "Scripts")
-						if err := os.MkdirAll(scriptsDir, 0755); err != nil {
-							fmt.Printf("创建Scripts目录失败: %v\n", err)
-						}
-					}
-				}
-			}
+		// 3. 运行get-pip.py
+		utils.Log.Install("运行get-pip.py安装pip...")
+		pythonExe := filepath.Join(installDir, "python.exe")
+		cmd := exec.Command(pythonExe, getPipPath, "--no-warn-script-location")
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			utils.Log.Warning(fmt.Sprintf("安装pip失败: %v\n%s", err, string(output)))
+			return nil
+		}
+
+		// 4. 创建Scripts目录（如果不存在）
+		scriptsDir := filepath.Join(installDir, "Scripts")
+		if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+			utils.Log.Warning(fmt.Sprintf("创建Scripts目录失败: %v", err))
 		}
 
 		return nil
@@ -435,26 +435,26 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 
 	// 如果是完整版本的Python，检查是否有pip
 	if hasLib && hasScripts {
-		fmt.Println("检测到完整版本的Python")
+		utils.Log.Install("检测到完整版本的Python")
 
 		// 检查pip是否存在
 		pipPath := filepath.Join(installDir, "Scripts", "pip.exe")
 		if _, err := os.Stat(pipPath); os.IsNotExist(err) {
 			// 如果pip不存在，尝试安装
-			fmt.Println("未检测到pip，尝试安装...")
+			utils.Log.Install("未检测到pip，尝试安装...")
 
 			// 使用ensurepip模块安装pip
 			pythonExe := filepath.Join(installDir, "python.exe")
 			cmd := exec.Command(pythonExe, "-m", "ensurepip", "--upgrade")
 			output, err := cmd.CombinedOutput()
 			if err != nil {
-				fmt.Printf("安装pip失败: %v\n%s\n", err, string(output))
+				utils.Log.Warning(fmt.Sprintf("安装pip失败: %v\n%s", err, string(output)))
 				// 继续执行，不返回错误
 			} else {
-				fmt.Println("pip安装成功")
+				utils.Log.Success("pip安装成功")
 			}
 		} else {
-			fmt.Println("检测到pip已安装")
+			utils.Log.Install("检测到pip已安装")
 		}
 
 		return nil
@@ -471,7 +471,7 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 
 				// 检查是否是Python可执行文件而不是安装程序
 				if strings.Contains(name, "embed") || name == "python.exe" {
-					fmt.Println("检测到Python可执行文件，无需额外安装")
+					utils.Log.Install("检测到Python可执行文件，无需额外安装")
 					return nil
 				}
 
@@ -480,7 +480,7 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 				// 不再创建额外的子目录，直接使用installDir
 
 				// 静默安装
-				fmt.Printf("正在安装Python到 %s\n", targetDir)
+				utils.Log.Install(fmt.Sprintf("正在安装Python到 %s", targetDir))
 				cmd := exec.Command(installer, "/quiet", "InstallAllUsers=0",
 					fmt.Sprintf("TargetDir=%s", targetDir),
 					"Include_test=0", "Include_tools=1", "PrependPath=1")
@@ -490,7 +490,7 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 					return fmt.Errorf("安装Python失败: %w\n%s", err, string(output))
 				}
 
-				fmt.Printf("Python安装完成: %s\n", targetDir)
+				utils.Log.Success(fmt.Sprintf("Python安装完成: %s", targetDir))
 				break
 			}
 		}
@@ -509,14 +509,14 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 
 				// 安装pkg
 				installCmd := fmt.Sprintf(`installer -pkg "%s" -target CurrentUserHomeDirectory`, pkg)
-				fmt.Printf("正在安装Python: %s\n", installCmd)
+				utils.Log.Install(fmt.Sprintf("正在安装Python: %s", installCmd))
 				cmd := exec.Command("bash", "-c", installCmd)
 				output, err := cmd.CombinedOutput()
 				if err != nil {
 					return fmt.Errorf("安装Python失败: %w\n%s", err, string(output))
 				}
 
-				fmt.Printf("Python安装完成\n")
+				utils.Log.Success("Python安装完成")
 				break
 			}
 		}
@@ -527,18 +527,18 @@ func (p *PythonSDKProvider) PostInstall(version, installDir string) error {
 			// 编译源码
 			configureCmd := fmt.Sprintf(`cd "%s" && ./configure --prefix="%s" && make && make install`,
 				extractDir, installDir)
-			fmt.Printf("正在编译Python: %s\n", configureCmd)
+			utils.Log.Install(fmt.Sprintf("正在编译Python: %s", configureCmd))
 			cmd := exec.Command("bash", "-c", configureCmd)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
 				return fmt.Errorf("编译Python失败: %w\n%s", err, string(output))
 			}
 
-			fmt.Printf("Python编译和安装完成\n")
+			utils.Log.Success("Python编译和安装完成")
 
 			// 删除源码目录
 			if err := os.RemoveAll(extractDir); err != nil {
-				fmt.Printf("警告：删除源码目录失败: %v\n", err)
+				utils.Log.Warning(fmt.Sprintf("警告：删除源码目录失败: %v", err))
 			}
 		}
 	}

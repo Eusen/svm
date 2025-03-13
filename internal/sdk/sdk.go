@@ -118,7 +118,7 @@ type BaseSDK struct {
 func NewBaseSDK(name string, provider SDKProvider, handlers VersionPrefixHandlers) *BaseSDK {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		fmt.Printf("警告：加载配置失败: %v，将使用默认配置\n", err)
+		utils.Log.Warning(fmt.Sprintf("加载配置失败: %v，将使用默认配置", err))
 		cfg = &config.Config{
 			InstallDir:      filepath.Join(os.Getenv("HOME"), ".svm"),
 			CurrentVersions: make(map[string]string),
@@ -175,7 +175,7 @@ func (b *BaseSDK) Install(version string) error {
 		return fmt.Errorf("无法获取可用版本列表: %w", err)
 	}
 
-	fmt.Printf("获取到 %d 个%s版本\n", len(availableVersions), b.Name)
+	utils.Log.Info(fmt.Sprintf("获取到 %d 个%s版本", len(availableVersions), b.Name))
 
 	// 查找最佳版本
 	targetVersion, found := b.FindBestVersion(version, availableVersions, b.VersionHandlers)
@@ -205,13 +205,13 @@ func (b *BaseSDK) Install(version string) error {
 			return fmt.Errorf("无法为%s版本获取下载URL", targetVersion)
 		}
 
-		fmt.Printf("下载URL: %s\n", downloadUrl)
+		utils.Log.Info(fmt.Sprintf("下载URL: %s", downloadUrl))
 
 		// 下载或使用缓存
 		downloadedFile, err := b.DownloadOrUseCachedFile(downloadUrl, versionDir, targetVersion, "")
 		if err != nil {
-			fmt.Printf("下载失败: %v\n", err)
-			fmt.Println("尝试下一个版本...")
+			utils.Log.Error(fmt.Sprintf("下载失败: %v", err))
+			utils.Log.Info("尝试下一个版本...")
 			// 尝试回退到下一个版本
 			return b.FallthroughToNextVersion(targetVersion, availableVersions, b.Install, b.VersionHandlers)
 		}
@@ -220,7 +220,7 @@ func (b *BaseSDK) Install(version string) error {
 	}
 
 	// 获取归档类型并解压
-	fmt.Println("正在解压文件...")
+	utils.Log.Extract("正在解压文件...")
 	archiveType := b.Provider.GetArchiveType()
 
 	// 如果archiveType是"auto"，则根据实际文件确定类型
@@ -228,20 +228,49 @@ func (b *BaseSDK) Install(version string) error {
 		archiveType = b.Provider.GetArchiveTypeForFile(archivePath)
 	}
 
+	utils.Log.Info(fmt.Sprintf("归档类型: %s, 文件路径: %s", archiveType, archivePath))
+
 	var err2 error
 
 	if archiveType == "zip" {
+		utils.Log.Extract(fmt.Sprintf("开始解压zip文件: %s 到 %s", archivePath, versionDir))
 		err2 = utils.ExtractZip(archivePath, versionDir)
+		if err2 != nil {
+			utils.Log.Error(fmt.Sprintf("解压zip文件失败: %v", err2))
+		} else {
+			utils.Log.Info("解压zip文件成功")
+		}
 	} else if archiveType == "tar.gz" || archiveType == "tgz" {
+		utils.Log.Extract(fmt.Sprintf("开始解压tar.gz文件: %s 到 %s", archivePath, versionDir))
 		err2 = utils.ExtractTarGzFile(archivePath, versionDir)
+		if err2 != nil {
+			utils.Log.Error(fmt.Sprintf("解压tar.gz文件失败: %v", err2))
+		} else {
+			utils.Log.Info("解压tar.gz文件成功")
+		}
+	} else if archiveType == "exe" {
+		// 对于.exe文件，使用ExtractExe函数处理
+		utils.Log.Extract(fmt.Sprintf("开始处理exe文件: %s", archivePath))
+		err2 = utils.ExtractExe(archivePath, versionDir)
+		if err2 != nil {
+			utils.Log.Error(fmt.Sprintf("处理exe文件失败: %v", err2))
+		} else {
+			utils.Log.Info("处理exe文件成功")
+		}
 	} else if archiveType == "none" {
 		// 对于不需要解压的类型（如可执行安装程序），直接复制到目标目录
-		fmt.Println("无需解压，直接处理...")
+		utils.Log.Info("无需解压，直接处理...")
 
 		// 如果文件不在目标目录，需要复制过去
 		if filepath.Dir(archivePath) != versionDir {
 			destPath := filepath.Join(versionDir, filepath.Base(archivePath))
+			utils.Log.Info(fmt.Sprintf("复制文件: %s 到 %s", archivePath, destPath))
 			err2 = utils.CopyFile(archivePath, destPath)
+			if err2 != nil {
+				utils.Log.Error(fmt.Sprintf("复制文件失败: %v", err2))
+			} else {
+				utils.Log.Info("复制文件成功")
+			}
 		}
 	} else {
 		err2 = fmt.Errorf("不支持的归档类型: %s", archiveType)
@@ -253,6 +282,7 @@ func (b *BaseSDK) Install(version string) error {
 
 	// 处理解压后的目录结构
 	extractDir := b.Provider.GetExtractDir(targetVersion, archivePath)
+	utils.Log.Info(fmt.Sprintf("解压后的目录: %s", extractDir))
 	if extractDir != "" {
 		srcDir := filepath.Join(versionDir, extractDir)
 		if _, err := os.Stat(srcDir); err == nil {
@@ -267,7 +297,7 @@ func (b *BaseSDK) Install(version string) error {
 					if _, err := os.Stat(dst); err == nil {
 						// 如果已存在，尝试删除
 						if err := os.RemoveAll(dst); err != nil {
-							fmt.Printf("警告：无法删除已存在的文件 %s: %v\n", dst, err)
+							utils.Log.Warning(fmt.Sprintf("警告：无法删除已存在的文件 %s: %v", dst, err))
 							continue
 						}
 					}
@@ -275,21 +305,21 @@ func (b *BaseSDK) Install(version string) error {
 					// 尝试移动文件
 					if err := os.Rename(src, dst); err != nil {
 						// 如果移动失败，尝试复制
-						fmt.Printf("移动文件失败，尝试复制: %s -> %s\n", src, dst)
+						utils.Log.Info(fmt.Sprintf("移动文件失败，尝试复制: %s -> %s", src, dst))
 						if utils.IsDirEntry(entry) {
 							if err := utils.CopyDir(src, dst); err != nil {
-								fmt.Printf("警告：复制目录失败 %s -> %s: %v\n", src, dst, err)
+								utils.Log.Warning(fmt.Sprintf("警告：复制目录失败 %s -> %s: %v", src, dst, err))
 							}
 						} else {
 							if err := utils.CopyFile(src, dst); err != nil {
-								fmt.Printf("警告：复制文件失败 %s -> %s: %v\n", src, dst, err)
+								utils.Log.Warning(fmt.Sprintf("警告：复制文件失败 %s -> %s: %v", src, dst, err))
 							}
 						}
 					}
 				}
 				// 尝试删除子目录
 				if err := os.RemoveAll(srcDir); err != nil {
-					fmt.Printf("警告：无法删除子目录 %s: %v\n", srcDir, err)
+					utils.Log.Warning(fmt.Sprintf("警告：无法删除子目录 %s: %v", srcDir, err))
 				}
 			}
 		}
@@ -300,7 +330,7 @@ func (b *BaseSDK) Install(version string) error {
 		return err
 	}
 
-	fmt.Printf("%s %s 安装完成\n", b.Name, targetVersion)
+	utils.Log.Info(fmt.Sprintf("%s %s 安装完成", b.Name, targetVersion))
 	return nil
 }
 
@@ -308,7 +338,43 @@ func (b *BaseSDK) Install(version string) error {
 func (b *BaseSDK) Remove(version string) error {
 	// 规范化版本号
 	version = b.VersionHandlers.Add(version)
-	return b.RemoveSDKVersion(version)
+
+	// 获取版本信息
+	versionInfo, exists := b.Config.GetVersionInfo(b.GetName(), version)
+	if !exists || versionInfo.InstallDir == "" {
+		return fmt.Errorf("版本 %s 未安装", version)
+	}
+
+	utils.Log.Delete(fmt.Sprintf("正在删除 %s %s...", b.GetName(), version))
+
+	// 检查是否为当前版本
+	currentVersion := b.Config.GetCurrentVersion(b.GetName())
+	if currentVersion == version {
+		utils.Log.Warning(fmt.Sprintf("正在删除当前使用的版本 %s", version))
+		// 如果是当前版本，清除环境变量设置
+		if err := b.Config.SetSDKEnvVars(b.GetName(), []config.EnvVar{}); err != nil {
+			utils.Log.Warning(fmt.Sprintf("清除环境变量失败: %v", err))
+		}
+
+		// 清除当前版本
+		if err := b.Config.SetCurrentVersion(b.GetName(), ""); err != nil {
+			utils.Log.Warning(fmt.Sprintf("清除当前版本失败: %v", err))
+		}
+	}
+
+	// 删除安装目录
+	if err := os.RemoveAll(versionInfo.InstallDir); err != nil {
+		return fmt.Errorf("删除目录失败: %w", err)
+	}
+
+	// 将安装目录置空，但保留缓存文件信息
+	versionInfo.InstallDir = ""
+	if err := b.Config.SetVersionInfo(b.GetName(), version, versionInfo); err != nil {
+		utils.Log.Warning(fmt.Sprintf("更新版本信息失败: %v", err))
+	}
+
+	utils.Log.Success(fmt.Sprintf("%s %s 已删除", b.GetName(), version))
+	return nil
 }
 
 // Use 统一实现的切换版本功能
@@ -316,9 +382,17 @@ func (b *BaseSDK) Use(version string) error {
 	// 规范化版本号
 	version = b.VersionHandlers.Add(version)
 
-	// 检查是否是已安装的版本
+	// 首先尝试直接使用版本号作为子目录（适用于大多数SDK）
 	versionDir := filepath.Join(b.InstallDir, version)
-	if _, err := os.Stat(versionDir); os.IsNotExist(err) {
+	exists, _ := utils.CheckDirExists(versionDir)
+
+	// 如果不存在，尝试.NET SDK的目录结构
+	if !exists {
+		versionDir = filepath.Join(b.InstallDir, "sdk", version)
+		exists, _ = utils.CheckDirExists(versionDir)
+	}
+
+	if !exists {
 		// 如果指定的版本目录不存在，尝试获取匹配的版本
 		fullVersion, err := b.getLatestMatchingVersion(version)
 		if err != nil {
@@ -327,13 +401,34 @@ func (b *BaseSDK) Use(version string) error {
 
 		// 更新版本和版本目录
 		version = fullVersion
+
+		// 再次尝试两种目录结构
 		versionDir = filepath.Join(b.InstallDir, version)
+		exists, _ = utils.CheckDirExists(versionDir)
+
+		if !exists {
+			versionDir = filepath.Join(b.InstallDir, "sdk", version)
+			exists, _ = utils.CheckDirExists(versionDir)
+		}
 
 		// 再次检查版本是否已安装
-		if _, err := os.Stat(versionDir); os.IsNotExist(err) {
-			fmt.Printf("版本 %s 未安装，正在自动安装...\n", version)
+		if !exists {
+			utils.Log.Info(fmt.Sprintf("版本 %s 未安装，正在自动安装...", version))
 			if err := b.Install(version); err != nil {
 				return err
+			}
+
+			// 安装后再次检查目录
+			versionDir = filepath.Join(b.InstallDir, version)
+			exists, _ = utils.CheckDirExists(versionDir)
+
+			if !exists {
+				versionDir = filepath.Join(b.InstallDir, "sdk", version)
+				exists, _ = utils.CheckDirExists(versionDir)
+
+				if !exists {
+					return fmt.Errorf("安装后版本目录仍不存在")
+				}
 			}
 		}
 	}
@@ -341,32 +436,19 @@ func (b *BaseSDK) Use(version string) error {
 	// 创建或更新软链接
 	currentDir := filepath.Join(b.InstallDir, "current")
 
-	// 如果current目录已存在，先删除它
-	if _, err := os.Stat(currentDir); err == nil {
-		// 在Windows上，需要先检查是否是目录或符号链接
-		if runtime.GOOS == "windows" {
-			// 获取文件属性
-			fileInfo, err := os.Lstat(currentDir)
-			if err != nil {
-				return fmt.Errorf("获取文件信息失败: %w", err)
-			}
-
-			// 检查是否是目录
-			if fileInfo.IsDir() {
-				// 如果是目录，使用os.RemoveAll删除
-				if err := os.RemoveAll(currentDir); err != nil {
-					return fmt.Errorf("删除现有目录失败: %w", err)
-				}
-			} else {
-				// 如果是符号链接或文件，使用os.Remove删除
-				if err := os.Remove(currentDir); err != nil {
-					return fmt.Errorf("删除现有链接失败: %w", err)
-				}
+	// 删除旧的current目录或符号链接
+	if fileInfo, err := os.Lstat(currentDir); err == nil {
+		// 检查是否是符号链接
+		if fileInfo.Mode()&os.ModeSymlink != 0 {
+			if err := os.Remove(currentDir); err != nil {
+				utils.Log.Warning(fmt.Sprintf("警告：删除旧的符号链接失败: %v", err))
+				return fmt.Errorf("删除旧的符号链接失败: %w", err)
 			}
 		} else {
-			// 在Unix系统上，直接删除符号链接
-			if err := os.Remove(currentDir); err != nil {
-				return fmt.Errorf("删除现有链接失败: %w", err)
+			// 是目录，删除它
+			if err := os.RemoveAll(currentDir); err != nil {
+				utils.Log.Warning(fmt.Sprintf("警告：删除旧的current目录失败: %v", err))
+				return fmt.Errorf("删除旧的current目录失败: %w", err)
 			}
 		}
 	}
@@ -375,19 +457,32 @@ func (b *BaseSDK) Use(version string) error {
 	if runtime.GOOS == "windows" {
 		// Windows需要管理员权限创建符号链接，使用junction作为替代
 		// 使用mklink命令创建目录连接
+		utils.Log.Link(fmt.Sprintf("正在创建目录连接: %s -> %s", currentDir, versionDir))
 		cmd := exec.Command("cmd", "/c", "mklink", "/J", currentDir, versionDir)
 		if err := cmd.Run(); err != nil {
 			// 如果mklink失败，尝试使用复制作为后备方案
-			fmt.Printf("警告：创建目录连接失败，将使用复制作为替代方案: %v\n", err)
+			utils.Log.Warning(fmt.Sprintf("警告：创建目录连接失败，将使用复制作为替代方案: %v", err))
 			if err := utils.CopyDir(versionDir, currentDir); err != nil {
 				return fmt.Errorf("复制目录失败: %w", err)
 			}
 		}
 	} else {
 		// Unix系统直接创建符号链接
+		utils.Log.Link(fmt.Sprintf("正在创建符号链接: %s -> %s", currentDir, versionDir))
 		if err := os.Symlink(versionDir, currentDir); err != nil {
 			return fmt.Errorf("创建符号链接失败: %w", err)
 		}
+	}
+
+	// 创建一个文件来记录当前版本
+	versionFile := filepath.Join(currentDir, ".version")
+	if err := os.WriteFile(versionFile, []byte(version), 0644); err != nil {
+		utils.Log.Warning(fmt.Sprintf("警告：写入版本文件失败: %v", err))
+	}
+
+	// 确保current目录存在
+	if _, err := os.Stat(currentDir); os.IsNotExist(err) {
+		return fmt.Errorf("current目录不存在，请先使用use命令切换版本")
 	}
 
 	// 检查是否已经设置过环境变量
@@ -408,7 +503,7 @@ func (b *BaseSDK) Use(version string) error {
 			return err
 		}
 
-		fmt.Printf("已切换到 %s %s\n", b.Name, version)
+		utils.Log.Switch(fmt.Sprintf("已切换到 %s %s", b.Name, version))
 	}
 
 	return nil
@@ -418,6 +513,20 @@ func (b *BaseSDK) Use(version string) error {
 func (b *BaseSDK) SetupEnv(version string) error {
 	// 使用固定的current目录而不是版本目录
 	currentDir := filepath.Join(b.InstallDir, "current")
+
+	// 首先尝试.NET SDK的目录结构
+	versionDir := filepath.Join(b.InstallDir, "sdk", version)
+
+	// 检查版本目录是否存在
+	exists, _ := utils.CheckDirExists(versionDir)
+	if !exists {
+		// 如果不存在，尝试直接使用版本号作为子目录（适用于其他SDK）
+		versionDir = filepath.Join(b.InstallDir, version)
+		exists, _ = utils.CheckDirExists(versionDir)
+		if !exists {
+			return fmt.Errorf("版本目录不存在: %s", versionDir)
+		}
+	}
 
 	// 确保current目录存在
 	if _, err := os.Stat(currentDir); os.IsNotExist(err) {
@@ -494,7 +603,7 @@ func (b *BaseSDK) FindBestVersion(requestedVersion string, availableVersions []s
 	// 调试输出
 	if len(availableVersions) > 0 {
 		count := min(5, len(availableVersions))
-		fmt.Printf("最新的几个%s版本: %v\n", b.Name, availableVersions[:count])
+		utils.Log.Info(fmt.Sprintf("最新的几个%s版本: %v", b.Name, availableVersions[:count]))
 	}
 
 	// 使用utils包中的函数查找最佳匹配版本
@@ -507,9 +616,9 @@ func (b *BaseSDK) FindBestVersion(requestedVersion string, availableVersions []s
 	targetVersion, found := utils.FindBestMatchingVersion(requestedVersion, availableVersions, stripPrefix)
 
 	if found && targetVersion != requestedVersion {
-		fmt.Printf("请求的版本 %s 不可用，将使用 %s\n", originalVersion, targetVersion)
+		utils.Log.Info(fmt.Sprintf("请求的版本 %s 不可用，将使用 %s", originalVersion, targetVersion))
 	} else if found {
-		fmt.Printf("找到匹配的版本: %s\n", targetVersion)
+		utils.Log.Info(fmt.Sprintf("找到匹配的版本: %s", targetVersion))
 	}
 
 	return targetVersion, found
@@ -517,15 +626,15 @@ func (b *BaseSDK) FindBestVersion(requestedVersion string, availableVersions []s
 
 // ValidateDownloadURL 验证下载URL是否有效
 func (b *BaseSDK) ValidateDownloadURL(url string) (bool, error) {
-	fmt.Printf("验证下载URL: %s\n", url)
+	utils.Log.Info(fmt.Sprintf("验证下载URL: %s", url))
 	exists, err := utils.CheckURLExists(url)
 	if err != nil {
-		fmt.Printf("验证URL失败: %v\n", err)
+		utils.Log.Error(fmt.Sprintf("验证URL失败: %v", err))
 	} else {
 		if exists {
-			fmt.Printf("URL有效\n")
+			utils.Log.Info("URL有效")
 		} else {
-			fmt.Printf("URL无效\n")
+			utils.Log.Info("URL无效")
 		}
 	}
 	return exists, err
@@ -540,7 +649,7 @@ func (b *BaseSDK) PrepareInstallDir(version string) (string, error) {
 	if exists && versionInfo.InstallDir != "" {
 		// 验证目录是否存在
 		if _, err := os.Stat(versionInfo.InstallDir); err == nil {
-			fmt.Printf("发现已有安装目录: %s\n", versionInfo.InstallDir)
+			utils.Log.Info(fmt.Sprintf("发现已有安装目录: %s", versionInfo.InstallDir))
 			return versionInfo.InstallDir, nil
 		}
 	}
@@ -554,11 +663,11 @@ func (b *BaseSDK) PrepareInstallDir(version string) (string, error) {
 	// 清理可能存在的旧文件
 	entries, err := os.ReadDir(versionDir)
 	if err == nil && len(entries) > 0 {
-		fmt.Println("清理安装目录中的旧文件...")
+		utils.Log.Info("清理安装目录中的旧文件...")
 		for _, entry := range entries {
 			path := filepath.Join(versionDir, entry.Name())
 			if err := os.RemoveAll(path); err != nil {
-				fmt.Printf("警告：无法删除文件 %s: %v\n", path, err)
+				utils.Log.Warning(fmt.Sprintf("无法删除文件 %s: %v", path, err))
 			}
 		}
 	}
@@ -574,7 +683,7 @@ func (b *BaseSDK) PrepareInstallDir(version string) (string, error) {
 
 	// 保存到配置
 	if err := b.Config.SetVersionInfo(b.GetName(), version, versionInfo); err != nil {
-		fmt.Printf("警告：保存版本信息失败: %v\n", err)
+		utils.Log.Warning(fmt.Sprintf("保存版本信息失败: %v", err))
 	}
 
 	return versionDir, nil
@@ -602,37 +711,31 @@ func (b *BaseSDK) GetOSName() string {
 // CleanupTempFile 清理临时文件
 func (b *BaseSDK) CleanupTempFile(filePath string) {
 	if err := os.Remove(filePath); err != nil {
-		fmt.Printf("警告：清理临时文件失败: %v\n", err)
+		utils.Log.Warning(fmt.Sprintf("清理临时文件失败: %v", err))
 	} else {
-		fmt.Printf("清理临时文件: %s\n", filePath)
+		utils.Log.Info(fmt.Sprintf("清理临时文件: %s", filePath))
 	}
 }
 
-// FallthroughToNextVersion 尝试下一个可用版本
-func (b *BaseSDK) FallthroughToNextVersion(currentVersion string, availableVersions []string, installer func(string) error, handlers VersionPrefixHandlers) error {
-	// 清理当前版本的安装目录
-	currentVersionDir := filepath.Join(b.InstallDir, currentVersion)
-	if _, err := os.Stat(currentVersionDir); err == nil {
-		fmt.Printf("清理失败的安装目录: %s\n", currentVersionDir)
-		if err := os.RemoveAll(currentVersionDir); err != nil {
-			fmt.Printf("警告：无法删除目录 %s: %v\n", currentVersionDir, err)
+// FallthroughToNextVersion 尝试回退到下一个版本
+func (b *BaseSDK) FallthroughToNextVersion(currentVersion string, availableVersions []string, installFunc func(string) error, handlers VersionPrefixHandlers) error {
+	// 查找当前版本在可用版本列表中的位置
+	currentIndex := -1
+	for i, v := range availableVersions {
+		if v == currentVersion {
+			currentIndex = i
+			break
 		}
 	}
 
-	// 从配置中移除当前版本信息
-	if err := b.Config.RemoveVersionInfo(b.GetName(), currentVersion); err != nil {
-		fmt.Printf("警告：无法从配置中移除版本信息: %v\n", err)
+	// 如果找到当前版本，尝试下一个版本
+	if currentIndex != -1 && currentIndex+1 < len(availableVersions) {
+		nextVersion := availableVersions[currentIndex+1]
+		utils.Log.Info(fmt.Sprintf("尝试下一个版本: %s", nextVersion))
+		return installFunc(handlers.Remove(nextVersion))
 	}
 
-	nextVersion, found := utils.GetNextVersionFromList(currentVersion, availableVersions)
-	if found {
-		fmt.Printf("版本 %s 无法下载，尝试下一个可用版本: %s\n", currentVersion, nextVersion)
-
-		// 递归尝试下一个版本
-		return installer(handlers.Remove(nextVersion))
-	}
-
-	return fmt.Errorf("无法找到可下载的%s版本，请检查网络连接或手动指定有效版本", b.Name)
+	return fmt.Errorf("没有更多可用的版本")
 }
 
 // min returns the smaller of x or y.
@@ -643,40 +746,44 @@ func min(x, y int) int {
 	return y
 }
 
-// SaveCacheFile 保存缓存文件信息
-func (b *BaseSDK) SaveCacheFile(version string, cacheFilePath string) error {
-	// 获取当前版本信息
-	versionInfo, exists := b.Config.GetVersionInfo(b.GetName(), version)
-
-	if !exists {
-		// 如果不存在版本信息，创建新的
-		versionInfo = config.SDKVersionInfo{
-			CacheFilePath: cacheFilePath,
-		}
-	} else {
-		// 更新缓存文件路径
-		versionInfo.CacheFilePath = cacheFilePath
-	}
-
-	// 保存到配置
-	return b.Config.SetVersionInfo(b.GetName(), version, versionInfo)
-}
-
-// GetCachedFile 获取缓存文件路径
+// GetCachedFile 获取缓存文件
 func (b *BaseSDK) GetCachedFile(version string) (string, bool) {
+	// 获取版本信息
 	versionInfo, exists := b.Config.GetVersionInfo(b.GetName(), version)
 	if !exists || versionInfo.CacheFilePath == "" {
 		return "", false
 	}
 
-	// 检查文件是否存在
-	if _, err := os.Stat(versionInfo.CacheFilePath); os.IsNotExist(err) {
-		fmt.Printf("已记录缓存文件路径，但文件不存在: %s\n", versionInfo.CacheFilePath)
+	// 检查缓存文件是否存在
+	if _, err := os.Stat(versionInfo.CacheFilePath); err != nil {
+		utils.Log.Warning(fmt.Sprintf("缓存文件不存在: %s", versionInfo.CacheFilePath))
 		return "", false
 	}
 
-	fmt.Printf("使用缓存文件: %s (跳过下载)\n", versionInfo.CacheFilePath)
+	// 检查文件是否为.exe文件，如果是则不使用缓存
+	if strings.HasSuffix(versionInfo.CacheFilePath, ".exe") {
+		utils.Log.Warning(fmt.Sprintf("缓存文件是.exe文件，不使用缓存: %s", versionInfo.CacheFilePath))
+		return "", false
+	}
+
+	utils.Log.Info(fmt.Sprintf("使用缓存文件: %s", versionInfo.CacheFilePath))
 	return versionInfo.CacheFilePath, true
+}
+
+// SaveCacheFile 保存缓存文件信息
+func (b *BaseSDK) SaveCacheFile(version, filePath string) error {
+	// 获取版本信息
+	versionInfo, exists := b.Config.GetVersionInfo(b.GetName(), version)
+	if !exists {
+		versionInfo = config.SDKVersionInfo{}
+	}
+
+	// 更新缓存文件路径
+	versionInfo.CacheFilePath = filePath
+	utils.Log.Info(fmt.Sprintf("保存缓存文件信息: %s -> %s", version, filePath))
+
+	// 保存版本信息
+	return b.Config.SetVersionInfo(b.GetName(), version, versionInfo)
 }
 
 // DownloadOrUseCachedFile 下载文件或使用缓存文件
@@ -699,11 +806,11 @@ func (b *BaseSDK) DownloadOrUseCachedFile(url string, targetDir string, version 
 	// 缓存文件路径
 	filePath := filepath.Join(cacheDir, fileName)
 
-	fmt.Printf("下载文件: %s\n", url)
-	fmt.Printf("缓存路径: %s\n", filePath)
+	utils.Log.Download(fmt.Sprintf("下载文件: %s", url))
+	utils.Log.Info(fmt.Sprintf("缓存路径: %s", filePath))
 
 	if tip != "" {
-		fmt.Printf("%s\n", tip)
+		utils.Log.Info(tip)
 	}
 
 	if err := utils.DownloadFile(url, filePath); err != nil {
@@ -712,47 +819,10 @@ func (b *BaseSDK) DownloadOrUseCachedFile(url string, targetDir string, version 
 
 	// 保存缓存文件信息
 	if err := b.SaveCacheFile(version, filePath); err != nil {
-		fmt.Printf("警告：保存缓存文件信息失败: %v\n", err)
+		utils.Log.Warning(fmt.Sprintf("保存缓存文件信息失败: %v", err))
 	}
 
 	return filePath, nil
-}
-
-// RemoveSDKVersion 删除SDK版本
-func (b *BaseSDK) RemoveSDKVersion(version string) error {
-	// 获取版本信息
-	versionInfo, exists := b.Config.GetVersionInfo(b.GetName(), version)
-	if !exists || versionInfo.InstallDir == "" {
-		return fmt.Errorf("版本 %s 未安装", version)
-	}
-
-	// 检查是否为当前版本
-	currentVersion := b.Config.GetCurrentVersion(b.GetName())
-	if currentVersion == version {
-		// 如果是当前版本，清除环境变量设置
-		if err := b.Config.SetSDKEnvVars(b.GetName(), []config.EnvVar{}); err != nil {
-			fmt.Printf("警告：清除环境变量失败: %v\n", err)
-		}
-
-		// 清除当前版本
-		if err := b.Config.SetCurrentVersion(b.GetName(), ""); err != nil {
-			fmt.Printf("警告：清除当前版本失败: %v\n", err)
-		}
-	}
-
-	// 删除安装目录
-	if err := os.RemoveAll(versionInfo.InstallDir); err != nil {
-		return fmt.Errorf("删除目录失败: %w", err)
-	}
-
-	// 将安装目录置空，但保留缓存文件信息
-	versionInfo.InstallDir = ""
-	if err := b.Config.SetVersionInfo(b.GetName(), version, versionInfo); err != nil {
-		fmt.Printf("警告：更新版本信息失败: %v\n", err)
-	}
-
-	fmt.Printf("%s %s 已删除\n", b.GetName(), version)
-	return nil
 }
 
 // getLatestMatchingVersion 获取最新匹配的版本

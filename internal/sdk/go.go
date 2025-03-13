@@ -238,25 +238,23 @@ func (p *GoSDKProvider) PostInstall(version, installDir string) error {
 			src := filepath.Join(goDir, entry.Name())
 			dst := filepath.Join(installDir, entry.Name())
 
-			// 检查目标是否存在
+			// 如果目标文件已存在，先删除
 			if _, err := os.Stat(dst); err == nil {
-				// 目标已存在，尝试删除
 				if err := os.RemoveAll(dst); err != nil {
-					fmt.Printf("警告：无法删除已存在的文件 %s: %v\n", dst, err)
+					utils.Log.Warning(fmt.Sprintf("无法删除已存在的文件 %s: %v", dst, err))
 					continue
 				}
 			}
 
 			// 移动文件
 			if err := os.Rename(src, dst); err != nil {
-				fmt.Printf("警告：移动文件失败 %s: %v\n", src, err)
-				// 不尝试复制，避免重复逻辑
+				utils.Log.Warning(fmt.Sprintf("移动文件失败 %s: %v", src, err))
 			}
 		}
 
 		// 删除go目录
 		if err := os.RemoveAll(goDir); err != nil {
-			fmt.Printf("警告：删除go目录失败: %v\n", err)
+			utils.Log.Warning(fmt.Sprintf("删除go目录失败: %v", err))
 		}
 	}
 

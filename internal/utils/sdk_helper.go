@@ -151,8 +151,11 @@ func CheckURLExists(url string) (bool, error) {
 		return false, err
 	}
 
-	// 打印响应状态码
-	fmt.Printf("URL响应状态码: %d\n", resp.StatusCode)
+	// 检查响应状态码
+	if resp.StatusCode != http.StatusOK {
+		Log.Warning(fmt.Sprintf("URL响应状态码: %d", resp.StatusCode))
+		return false, nil
+	}
 
 	return resp.StatusCode == http.StatusOK, nil
 }

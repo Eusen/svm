@@ -40,7 +40,7 @@ func initJavaCmd() {
 
 				// 检查目录是否存在
 				if _, err := os.Stat(installDir); os.IsNotExist(err) {
-					fmt.Println("未找到已安装的 Java 版本")
+					utils.Log.Info("未找到已安装的 Java 版本")
 					return nil
 				}
 
@@ -59,7 +59,7 @@ func initJavaCmd() {
 				}
 
 				if len(installedVersions) == 0 {
-					fmt.Println("未找到已安装的 Java 版本")
+					utils.Log.Info("未找到已安装的 Java 版本")
 					return nil
 				}
 
@@ -69,12 +69,12 @@ func initJavaCmd() {
 				// 获取当前使用的版本
 				currentVersion, _ := javaSdk.GetCurrentVersion()
 
-				fmt.Println("已安装的 Java 版本：")
+				utils.Log.Info("已安装的 Java 版本：")
 				for _, version := range installedVersions {
 					if version == currentVersion {
-						fmt.Printf("- %s (当前使用)\n", version)
+						utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version+" (当前使用)")
 					} else {
-						fmt.Printf("- %s\n", version)
+						utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 					}
 				}
 				return nil
@@ -97,13 +97,13 @@ func initJavaCmd() {
 			}
 
 			if all {
-				fmt.Println("所有可用的 Java 版本：")
+				utils.Log.Info("所有可用的 Java 版本：")
 			} else {
-				fmt.Println("可用的 Java 版本：")
+				utils.Log.Info("可用的 Java 版本：")
 			}
 
 			for _, version := range versions {
-				fmt.Printf("- %s\n", version)
+				utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 			}
 			return nil
 		},
@@ -121,6 +121,7 @@ func initJavaCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			javaSdk := GetSDK("java")
+			utils.Log.Install(fmt.Sprintf("正在安装 Java 版本 %s...", version))
 			return javaSdk.Install(version)
 		},
 	}
@@ -132,6 +133,7 @@ func initJavaCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			javaSdk := GetSDK("java")
+			utils.Log.Delete(fmt.Sprintf("正在删除 Java 版本 %s...", version))
 			return javaSdk.Remove(version)
 		},
 	}
@@ -143,6 +145,7 @@ func initJavaCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			javaSdk := GetSDK("java")
+			utils.Log.Switch(fmt.Sprintf("正在切换到 Java 版本 %s...", version))
 			return javaSdk.Use(version)
 		},
 	}
@@ -155,14 +158,15 @@ func initJavaCmd() {
 			version, err := javaSdk.GetCurrentVersion()
 			if err != nil {
 				// 不返回错误，而是显示友好的消息
-				fmt.Println("当前未设置 Java 版本")
+				utils.Log.Info("当前未设置 Java 版本")
 				return nil
 			}
 
 			if version == "" {
-				fmt.Println("当前未设置 Java 版本")
+				utils.Log.Info("当前未设置 Java 版本")
 			} else {
-				fmt.Printf("当前使用的 Java 版本: %s\n", version)
+				utils.Log.Info("当前使用的 Java 版本:")
+				utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version)
 			}
 			return nil
 		},

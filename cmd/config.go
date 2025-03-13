@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"svm/internal/config"
+	"svm/internal/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -45,7 +46,7 @@ var setInstallDirCmd = &cobra.Command{
 			return fmt.Errorf("读取目录失败: %w", err)
 		}
 		if len(entries) > 0 {
-			fmt.Println("警告：目标目录不为空，现有的SDK将保持在原位置")
+			utils.Log.Warning("警告：目标目录不为空，现有的SDK将保持在原位置")
 		}
 
 		// 更新配置
@@ -53,7 +54,7 @@ var setInstallDirCmd = &cobra.Command{
 			return fmt.Errorf("保存配置失败: %w", err)
 		}
 
-		fmt.Printf("已将安装目录设置为: %s\n", absDir)
+		utils.Log.Success(fmt.Sprintf("已将安装目录设置为: %s", absDir))
 		return nil
 	},
 }
@@ -68,7 +69,7 @@ var getInstallDirCmd = &cobra.Command{
 			return fmt.Errorf("加载配置失败: %w", err)
 		}
 
-		fmt.Printf("当前安装目录: %s\n", cfg.InstallDir)
+		utils.Log.Info(fmt.Sprintf("当前安装目录: %s", cfg.InstallDir))
 		return nil
 	},
 }
@@ -77,4 +78,4 @@ func initConfigCmd() {
 	configCmd.AddCommand(setInstallDirCmd)
 	configCmd.AddCommand(getInstallDirCmd)
 	rootCmd.AddCommand(configCmd)
-} 
+}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 // ExtractTarGz 解压tar.gz文件
@@ -47,7 +48,7 @@ func ExtractTarGz(gzipStream io.Reader, destPath string) error {
 			}
 			outFile.Close()
 		default:
-			fmt.Printf("未处理的tar类型: %c in file %s\n", header.Typeflag, path)
+			Log.Warning(fmt.Sprintf("未处理的tar类型: %c in file %s", header.Typeflag, path))
 		}
 	}
 	return nil
@@ -129,4 +130,40 @@ func createFile(path string) (*os.File, error) {
 	}
 	// 创建文件
 	return os.Create(path)
+}
+
+// ExtractExe 处理Windows可执行安装程序
+func ExtractExe(exePath, destPath string) error {
+	// 确保目标目录存在
+	if err := os.MkdirAll(destPath, 0755); err != nil {
+		return fmt.Errorf("创建目标目录失败: %w", err)
+	}
+
+	// 检查是否在Windows系统上
+	if runtime.GOOS != "windows" {
+		return fmt.Errorf("只能在Windows系统上运行.exe安装程序")
+	}
+
+	// 提示用户手动安装
+	Log.Warning("\n\n注意：.NET SDK安装程序需要管理员权限才能运行。")
+	Log.Warning("请手动运行以下安装程序：")
+	Log.Warning(fmt.Sprintf("%s /install /quiet /norestart", exePath))
+	Log.Warning("安装完成后，请按任意键继续...")
+
+	// 等待用户按键
+	fmt.Scanln()
+
+	// 复制安装程序到目标目录，以便后续使用
+	destExePath := filepath.Join(destPath, filepath.Base(exePath))
+	if err := CopyFile(exePath, destExePath); err != nil {
+		Log.Warning(fmt.Sprintf("复制安装程序到目标目录失败: %v", err))
+	}
+
+	// 创建一个标记文件，表示安装已完成
+	markerFile := filepath.Join(destPath, "installation_completed.txt")
+	if err := os.WriteFile(markerFile, []byte("Installation completed"), 0644); err != nil {
+		Log.Warning(fmt.Sprintf("创建标记文件失败: %v", err))
+	}
+
+	return nil
 }

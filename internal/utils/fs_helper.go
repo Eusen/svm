@@ -16,6 +16,18 @@ func IsFileEntry(entry os.DirEntry) bool {
 	return !entry.IsDir()
 }
 
+// CheckDirExists 检查目录是否存在
+func CheckDirExists(dirPath string) (bool, error) {
+	info, err := os.Stat(dirPath)
+	if os.IsNotExist(err) {
+		return false, err
+	}
+	if err != nil {
+		return false, err
+	}
+	return info.IsDir(), nil
+}
+
 // CopyFile 复制文件
 func CopyFile(src, dst string) error {
 	srcFile, err := os.Open(src)
@@ -65,4 +77,4 @@ func CopyDir(src, dst string) error {
 	}
 
 	return nil
-} 
+}

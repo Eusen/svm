@@ -111,14 +111,14 @@ func (p *JavaSDKProvider) GetDownloadURL(version, osName, arch string) string {
 	// 获取下载链接
 	resp, err := http.Get(apiUrl)
 	if err != nil {
-		fmt.Printf("警告：获取下载链接失败: %v\n", err)
+		utils.Log.Warning(fmt.Sprintf("获取下载链接失败: %v", err))
 		return ""
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("警告：读取下载链接失败: %v\n", err)
+		utils.Log.Warning(fmt.Sprintf("读取下载链接失败: %v", err))
 		return ""
 	}
 
@@ -127,12 +127,12 @@ func (p *JavaSDKProvider) GetDownloadURL(version, osName, arch string) string {
 	}
 
 	if err := json.Unmarshal(body, &releases); err != nil {
-		fmt.Printf("警告：解析下载链接失败: %v\n", err)
+		utils.Log.Warning(fmt.Sprintf("解析下载链接失败: %v", err))
 		return ""
 	}
 
 	if len(releases) == 0 {
-		fmt.Println("警告：未找到适合当前系统的Java版本")
+		utils.Log.Warning("警告：未找到适合当前系统的Java版本")
 		return ""
 	}
 
@@ -189,94 +189,69 @@ func (p *JavaSDKProvider) PreInstall(version string) error {
 
 // PostInstall 安装后的处理工作
 func (p *JavaSDKProvider) PostInstall(version, installDir string) error {
-	// 对于Java，我们需要找到解压后的实际JDK目录
+	// 查找JDK目录
 	entries, err := os.ReadDir(installDir)
 	if err != nil {
 		return fmt.Errorf("读取安装目录失败: %w", err)
 	}
 
-	// 寻找可能的JDK目录 - 通常是唯一的目录或者名称包含"jdk"的目录
+	// 查找JDK目录
 	var jdkDir string
 	for _, entry := range entries {
-		if entry.IsDir() {
-			name := entry.Name()
-			if strings.Contains(strings.ToLower(name), "jdk") || strings.Contains(strings.ToLower(name), "java") {
-				jdkDir = filepath.Join(installDir, name)
-				break
+		if entry.IsDir() && strings.Contains(strings.ToLower(entry.Name()), "jdk") {
+			jdkDir = filepath.Join(installDir, entry.Name())
+			break
+		}
+	}
+
+	if jdkDir == "" {
+		return nil // 没有找到JDK目录，可能已经是正确的结构
+	}
+
+	// 移动JDK目录中的文件到安装目录
+	utils.Log.Move(fmt.Sprintf("正在移动文件从 %s 到 %s", jdkDir, installDir))
+
+	// 读取JDK目录中的文件
+	jdkEntries, err := os.ReadDir(jdkDir)
+	if err != nil {
+		return fmt.Errorf("读取JDK目录失败: %w", err)
+	}
+
+	// 移动文件
+	for _, entry := range jdkEntries {
+		src := filepath.Join(jdkDir, entry.Name())
+		dst := filepath.Join(installDir, entry.Name())
+
+		// 如果目标文件已存在，先删除
+		if _, err := os.Stat(dst); err == nil {
+			if err := os.RemoveAll(dst); err != nil {
+				utils.Log.Warning(fmt.Sprintf("无法删除已存在的文件 %s: %v", dst, err))
+				continue
 			}
-			// 如果只有一个目录，也可能是JDK目录
-			if jdkDir == "" {
-				jdkDir = filepath.Join(installDir, name)
+		}
+
+		// 移动文件
+		if err := os.Rename(src, dst); err != nil {
+			utils.Log.Warning(fmt.Sprintf("移动文件失败 %s: %v，尝试复制", src, err))
+
+			// 如果移动失败，尝试复制
+			if entry.IsDir() {
+				if err := utils.CopyDir(src, dst); err != nil {
+					utils.Log.Warning(fmt.Sprintf("复制目录失败 %s: %v", src, err))
+					continue
+				}
+			} else {
+				if err := utils.CopyFile(src, dst); err != nil {
+					utils.Log.Warning(fmt.Sprintf("复制文件失败 %s: %v", src, err))
+					continue
+				}
 			}
 		}
 	}
 
-	// 如果找到了JDK目录，需要将所有文件移动到安装根目录
-	if jdkDir != "" && jdkDir != installDir {
-		fmt.Printf("正在移动文件从 %s 到 %s\n", jdkDir, installDir)
-
-		// 移动所有文件到根目录
-		entries, err := os.ReadDir(jdkDir)
-		if err != nil {
-			return fmt.Errorf("读取JDK目录失败: %w", err)
-		}
-
-		for _, entry := range entries {
-			src := filepath.Join(jdkDir, entry.Name())
-			dst := filepath.Join(installDir, entry.Name())
-
-			// 检查目标是否存在
-			if _, err := os.Stat(dst); err == nil {
-				// 目标已存在，尝试删除
-				if err := os.RemoveAll(dst); err != nil {
-					fmt.Printf("警告：无法删除已存在的文件 %s: %v\n", dst, err)
-					continue
-				}
-			}
-
-			// 移动文件
-			if err := os.Rename(src, dst); err != nil {
-				fmt.Printf("警告：移动文件失败 %s: %v，尝试复制\n", src, err)
-
-				// 如果移动失败，尝试复制
-				if entry.IsDir() {
-					if err := filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
-						if err != nil {
-							return err
-						}
-
-						// 计算相对路径
-						relPath, err := filepath.Rel(src, path)
-						if err != nil {
-							return err
-						}
-
-						// 目标路径
-						target := filepath.Join(dst, relPath)
-
-						// 如果是目录，创建目录
-						if info.IsDir() {
-							return os.MkdirAll(target, info.Mode())
-						}
-
-						// 复制文件
-						return copyFile(path, target)
-					}); err != nil {
-						fmt.Printf("警告：复制目录失败 %s: %v\n", src, err)
-					}
-				} else {
-					// 复制单个文件
-					if err := copyFile(src, dst); err != nil {
-						fmt.Printf("警告：复制文件失败 %s: %v\n", src, err)
-					}
-				}
-			}
-		}
-
-		// 删除原目录
-		if err := os.RemoveAll(jdkDir); err != nil {
-			fmt.Printf("警告：删除原目录失败 %s: %v\n", jdkDir, err)
-		}
+	// 删除JDK目录
+	if err := os.RemoveAll(jdkDir); err != nil {
+		utils.Log.Warning(fmt.Sprintf("删除原目录失败 %s: %v", jdkDir, err))
 	}
 
 	return nil

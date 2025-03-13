@@ -40,7 +40,7 @@ func initNodeCmd() {
 
 				// 检查目录是否存在
 				if _, err := os.Stat(installDir); os.IsNotExist(err) {
-					fmt.Println("未找到已安装的 Node.js 版本")
+					utils.Log.Info("未找到已安装的 Node.js 版本")
 					return nil
 				}
 
@@ -59,7 +59,7 @@ func initNodeCmd() {
 				}
 
 				if len(installedVersions) == 0 {
-					fmt.Println("未找到已安装的 Node.js 版本")
+					utils.Log.Info("未找到已安装的 Node.js 版本")
 					return nil
 				}
 
@@ -69,12 +69,12 @@ func initNodeCmd() {
 				// 获取当前使用的版本
 				currentVersion, _ := nodeSdk.GetCurrentVersion()
 
-				fmt.Println("已安装的 Node.js 版本：")
+				utils.Log.Info("已安装的 Node.js 版本：")
 				for _, version := range installedVersions {
 					if version == currentVersion {
-						fmt.Printf("- %s (当前使用)\n", version)
+						utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version+" (当前使用)")
 					} else {
-						fmt.Printf("- %s\n", version)
+						utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 					}
 				}
 				return nil
@@ -97,13 +97,13 @@ func initNodeCmd() {
 			}
 
 			if all {
-				fmt.Println("所有可用的 Node.js 版本：")
+				utils.Log.Info("所有可用的 Node.js 版本：")
 			} else {
-				fmt.Println("可用的 Node.js 版本：")
+				utils.Log.Info("可用的 Node.js 版本：")
 			}
 
 			for _, version := range versions {
-				fmt.Printf("- %s\n", version)
+				utils.Log.Custom(utils.IconStar, utils.Green, "", version)
 			}
 			return nil
 		},
@@ -121,6 +121,7 @@ func initNodeCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			nodeSdk := GetSDK("node")
+			utils.Log.Install(fmt.Sprintf("正在安装 Node.js 版本 %s...", version))
 			return nodeSdk.Install(version)
 		},
 	}
@@ -132,6 +133,7 @@ func initNodeCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			nodeSdk := GetSDK("node")
+			utils.Log.Delete(fmt.Sprintf("正在删除 Node.js 版本 %s...", version))
 			return nodeSdk.Remove(version)
 		},
 	}
@@ -143,6 +145,7 @@ func initNodeCmd() {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			version := args[0]
 			nodeSdk := GetSDK("node")
+			utils.Log.Switch(fmt.Sprintf("正在切换到 Node.js 版本 %s...", version))
 			return nodeSdk.Use(version)
 		},
 	}
@@ -155,14 +158,15 @@ func initNodeCmd() {
 			version, err := nodeSdk.GetCurrentVersion()
 			if err != nil {
 				// 不返回错误，而是显示友好的消息
-				fmt.Println("当前未设置 Node.js 版本")
+				utils.Log.Info("当前未设置 Node.js 版本")
 				return nil
 			}
 
 			if version == "" {
-				fmt.Println("当前未设置 Node.js 版本")
+				utils.Log.Info("当前未设置 Node.js 版本")
 			} else {
-				fmt.Printf("当前使用的 Node.js 版本: %s\n", version)
+				utils.Log.Info("当前使用的 Node.js 版本:")
+				utils.Log.Custom(utils.IconHeart, utils.Magenta, "", version)
 			}
 			return nil
 		},

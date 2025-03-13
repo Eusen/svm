@@ -152,3 +152,30 @@ func (e *EnvManager) setUnixEnv() error {
 
 	return nil
 }
+
+// AddToPath 将指定路径添加到PATH环境变量
+func AddToPath(path string) error {
+	// 获取当前PATH
+	currentPath := os.Getenv("PATH")
+
+	// 检查路径是否已经在PATH中
+	pathSep := string(os.PathListSeparator)
+	paths := strings.Split(currentPath, pathSep)
+	for _, p := range paths {
+		if p == path {
+			// 路径已经在PATH中，无需添加
+			return nil
+		}
+	}
+
+	// 添加路径到PATH
+	newPath := path + pathSep + currentPath
+
+	// 设置环境变量
+	return os.Setenv("PATH", newPath)
+}
+
+// SetEnvVar 设置环境变量
+func SetEnvVar(key, value string) error {
+	return os.Setenv(key, value)
+}
