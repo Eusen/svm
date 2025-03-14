@@ -2,7 +2,7 @@
 <h1>✨ SVM ✨</h1>
 <h4>SDK Version Manager</h4>
   
-![SVM Logo](https://img.shields.io/badge/svm-v1.0.0-blue)
+![SVM Logo](https://img.shields.io/badge/svm-v1.1.0-blue)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8.svg)](https://go.dev/)
 [![Made with Cursor](https://img.shields.io/badge/Made%20with-Cursor%20AI-blueviolet)](https://cursor.sh/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -19,12 +19,13 @@
 
 ## 🌟 主要特点
 
-- 🔄 **多语言支持**: 管理 Node.js, Go, Java, Python 等多种语言环境
+- 🔄 **多语言支持**: 管理 Node.js, Go, Java, Python, .NET 等多种语言环境
 - 🔍 **版本发现**: 自动获取官方最新版本列表
 - 📦 **简单安装**: 一键安装任意版本的SDK
 - 🔀 **快速切换**: 在不同版本间无缝切换
 - 🔧 **自动配置**: 自动设置所需的环境变量
 - 💻 **跨平台**: 支持 Windows, macOS 和 Linux
+- 🎨 **彩色输出**: 美化的命令行界面，带有图标和彩色文本
 
 ## 📋 支持的语言
 
@@ -34,6 +35,7 @@
 | Go | ✅ | 完整支持 |
 | Java | ✅ | 完整支持 |
 | Python | ✅ | 完整支持 |
+| .NET | ✅ | 完整支持 (SDK, ASP.NET Core, 桌面运行时, .NET 运行时) |
 | Rust | 🔜 | 计划中 |
 | Swift | 🔜 | 计划中 |
 | Deno | 🔜 | 计划中 |
@@ -63,6 +65,7 @@ svm node list
 svm go list
 svm java list
 svm python list
+svm dotnet sdk list
 
 # 列出所有版本（不过滤）
 svm node list -a
@@ -77,24 +80,28 @@ svm node install 16.20.2
 svm go install 1.24.1
 svm java install 17
 svm python install 3.12.9
+svm dotnet sdk install 8.0.100
 
 # 切换版本
 svm node use 16.20.2
 svm go use 1.24.1
 svm java use 17
 svm python use 3.12.9
+svm dotnet sdk use 8.0.100
 
 # 删除版本
 svm node remove 14.21.3
 svm go remove 1.23.0
 svm java remove 11
 svm python remove 3.11.8
+svm dotnet sdk remove 7.0.100
 
 # 显示当前使用的版本
 svm node current
 svm go current
 svm java current
 svm python current
+svm dotnet sdk current
 
 # 配置安装目录
 svm config set-install-dir D:\SDKs
@@ -109,6 +116,7 @@ SVM 会自动处理所需的环境变量设置：
 - **Go**: 设置 GOROOT 和 PATH
 - **Java**: 设置 JAVA_HOME 和 PATH
 - **Python**: 设置 PYTHONHOME 和 PATH
+- **.NET**: 设置 DOTNET_ROOT 和 PATH
 
 ## 🏗️ 项目结构
 
@@ -119,6 +127,7 @@ svm/
 │   ├── config/        # 配置管理
 │   ├── sdk/           # SDK 实现
 │   └── utils/         # 工具函数
+├── docs/              # 文档
 ├── main.go            # 程序入口
 └── README.md          # 项目文档
 ```
@@ -129,6 +138,21 @@ svm/
 - **简单直观**: 无需记忆复杂的命令和选项
 - **自动化**: 自动处理环境变量和路径设置
 - **轻量级**: 单一可执行文件，无需复杂安装
+- **美观界面**: 彩色输出和图标，提升用户体验
+
+## 📝 更新日志
+
+### v1.1.0
+- 新增 .NET 版本管理功能
+- 命令行界面美化，添加彩色输出
+- 日志系统重构
+- 环境变量管理改进
+- 详细更新日志请查看 [v1.1.0.md](docs/v1.1.0.md)
+
+### v1.0.0
+- 初始版本发布
+- 支持 Node.js, Go, Java, Python 版本管理
+- 详细更新日志请查看 [v1.0.0.md](docs/v1.0.0.md)
 
 ## 🔮 未来计划
 
